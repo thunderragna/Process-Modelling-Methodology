@@ -1,0 +1,329 @@
+---
+title: "exam_pmm"
+author: "Schloessmann"
+date: "2026-02-05"
+output: html_document
+---
+
+# 0.0 load libraries
+
+```{r}
+library(deSolve)
+library(lattice)
+library(growthrates)
+library(ggplot2)
+```
+
+# 1.0 Load data
+```{r}
+picea_growth <- read.delim("picea.txt", stringsAsFactors=TRUE)
+```
+
+## 1.1 assign datatypes
+```{r}
+picea_growth$location <- as.factor(picea_growth$location)
+picea_growth$tree <- as.factor(picea_growth$tree)
+picea_growth$volume <- as.double(picea_growth$volume)
+```
+
+# 2.0 Subsetting the areas
+```{r}
+area1 <- subset(picea_growth, location == 2) # altitude above 1000m, cold temperatures
+area2 <- subset(picea_growth, location == 7) # altitude below 1000m, temperate climate like in Harz region
+```
+
+```{r}
+head(picea_growth)
+```
+
+# 3.0 plot height and dbh by location
+```{r}
+plot(
+  picea_growth$height,
+  picea_growth$dbh,
+  xlab = "height",
+  ylab = "dbh",
+  col = picea_growth$location
+)
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(picea_growth, aes(x = age.base, y = height)) +
+  # Punkte für Area 1
+  geom_point(
+    data = subset(picea_growth, location == 2),
+    aes(color = "area 1"),
+    shape = 1
+  ) +
+  # Punkte für Area 2
+  geom_point(
+    data = subset(picea_growth, location == 7),
+    aes(color = "area 2"),
+    shape = 1
+  ) +
+  # Farben manuell festlegen
+  scale_color_manual(
+    name = "Legend",
+    values = c(
+      "area 1" = "magenta",
+      "area 2" = "black"
+    )
+  ) +
+  labs(
+    x = "Age",
+    y = "Height [m]",
+    #title = "Picea abies height growth"
+  ) +
+  theme_minimal()
+```
+
+# 4.0 Creating model for area1 (black/the higher altitude)
+```{r}
+max(area1$height)
+```
+
+
+```{r}
+x <- area1$age.base
+y1.0 <- grow_logistic(x, c(y0=0.1, mumax=0.05, K=38.1))[,"y"]
+y1.1 <- grow_gompertz(x, c(y0=0.1, mumax=0.05, K=38.1))[,"y"]
+```
+
+
+
+```{r}
+ggplot(area1, aes(x=age.base, y=height)) +
+  geom_point(shape=1, col="magenta") +
+  geom_line(aes(x=x, y=y1.0), col="red") +
+  geom_line(aes(x=x, y=y1.1), col="green")
+```
+```{r}
+
+
+ggplot(area1, aes(x = age.base)) +
+  geom_point(aes(y = height, color = "area 1"), shape = 1) +
+  geom_line(aes(y = y1.0, color = "Logistic model")) +
+  geom_line(aes(y = y1.1, color = "Gompertz model")) +
+  scale_color_manual(
+    name = "Legend",
+    values = c(
+      "area 1" = "magenta",
+      "Logistic model" = "red",
+      "Gompertz model" = "green"
+    )
+  ) +
+  labs(
+    title = "First try for growthmodels for area 1",
+    x = "Age",
+    y = "Height [m]"
+  ) +
+  theme_minimal()
+```
+
+ 
+# 5.0 Model calibration
+```{r}
+p   <- c(y0 = 0.1, mumax = 0.05, K = 38.1)
+fit1.0 <- fit_growthmodel(grow_logistic, p=p, time=area1$age.base, 
+                       y=area1$height)
+
+fit1.1 <-fit_growthmodel(grow_gompertz, p=p, time=area1$age.base, 
+                       y=area1$height)
+?fit_growthmodel
+```
+
+```{r}
+fit1.0@fit$par
+```
+
+```{r}
+fit1.1@fit$par
+```
+
+
+```{r}
+res1.0  <-as.data.frame(predict(fit1.0))
+res1.1 <- as.data.frame(predict(fit1.1))
+
+```
+
+```{r}
+ggplot(area1, aes(x = age.base)) +
+  geom_point(aes(y = height, color = "trees area 1"), shape = 1) +
+  #geom_line(data = res1.0, aes(x = x, y = y, color = "logistic")) +
+  geom_line(data = res1.1, aes(x = x, y = y, color = "growth model")) + #Gompertz
+  scale_color_manual(
+    name = "Legend",
+    values = c(
+      "trees area 1" = "magenta",
+    #  "logistic" = "red",
+      "growth model" = "green"
+    )
+  ) +
+  labs(
+    x = "Age",
+    y = "Height [m]"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+head(fit1.0@fit$residuals)
+```
+## 5.1 Check the sum of squared residuals
+```{r}
+sum(fit1.0@fit$residuals^2)
+```
+
+```{r}
+sum(fit1.1@fit$residuals^2)
+```
+In case 1.0 the sum of the squared residuals is higher, that means, that the residuals are farer away from the fitted curve in case 1.0 compared to 1.1(gompertz)
+
+# _____________________________________________________
+
+# 6.0 parameters for area2
+
+```{r}
+max(area2$height)
+```
+
+```{r}
+x2 <- area2$age.base
+y2.0 <- grow_logistic(x2, c(y0=0.1, mumax=0.05, K=21.6))[,"y"]
+y2.1 <- grow_gompertz(x2, c(y0=0.1, mumax=0.05, K=21.6))[,"y"]
+```
+
+## 6.1 Plotting the parameters for area2 with logistic and Gompertz 
+```{r}
+ggplot(area2, aes(x = age.base)) +
+  geom_point(aes(y = height, color = "area 2"), shape = 1) +
+  geom_line(aes(y = y2.0, color = "Logistic model")) +
+  geom_line(aes(y = y2.1, color = "Gompertz model")) +
+  scale_color_manual(
+    name = "Legend",
+    values = c(
+      "area 2" = "black",
+      "Logistic model" = "red",
+      "Gompertz model" = "green"
+    )
+  ) +
+  labs(
+    title = "First try for growthmodels for area 2",
+    x = "Age",
+    y = "Height [m]"
+  ) +
+  theme_minimal()
+```
+
+# 7.0 fitting 
+```{r}
+p2  <- c(y0 = 0.1, mumax = 0.05, K = 26.1)
+fit2.0 <- fit_growthmodel(grow_logistic, p=p2, time=area2$age.base, 
+                       y=area2$height)
+
+fit2.1 <-fit_growthmodel(grow_gompertz, p=p2, time=area2$age.base, 
+                       y=area2$height)
+```
+
+```{r}
+fit2.0@fit$par
+```
+
+```{r}
+fit2.1@fit$par
+```
+
+# 7.1 Creating dataframes with fitted values
+
+```{r}
+res2.0  <-as.data.frame(predict(fit2.0))
+res2.1 <- as.data.frame(predict(fit2.1))
+```
+
+```{r}
+ggplot(area2, aes(x = age.base)) +
+  geom_point(aes(y = height, color = "trees area 2"), shape = 1) +
+ # geom_line(data = res2.0, aes(x = x2, y = y, color = "logistic")) +
+  geom_line(data = res2.1, aes(x = x2, y = y, color = "growth model")) +
+  scale_color_manual(
+    name = "Legend",
+    values = c(
+    "trees area 2" = "black",
+     # "logistic" = "red",
+      "growth model" = "green"
+    )
+  ) +
+  labs(
+    x = "Age",
+    y = "Height [m]"
+  ) +
+  theme_minimal()
+```
+
+## Check residuals
+
+```{r}
+sum(fit2.0@fit$residuals^2)
+```
+
+```{r}
+sum(fit2.1@fit$residuals^2)
+```
+
+# 8.0 Comparing
+
+```{r}
+ggplot(area2, aes(x = age.base)) +
+ # geom_point(aes(y = height, color = "trees area 2"), shape = 1) +
+  geom_line(data = res1.1, aes(x = x, y = y, color = "growth model a1")) +
+  geom_line(data = res2.1, aes(x = x2, y = y, color = "growth model a2")) +
+  scale_color_manual(
+    name = "Legend",
+    values = c(
+    "growth model a1" = "magenta",
+     # "logistic" = "red",
+      "growth model a2" = "black"
+    )
+  ) +
+  labs(
+    x = "Age",
+    y = "Height [m]"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+ggplot() +
+  # Points for Area 1
+  geom_point(data = area1, 
+             aes(x = age.base, y = height, color = "trees area 1"), 
+             shape = 1) +
+  # Points for Area 2
+  geom_point(data = area2, 
+             aes(x = age.base, y = height, color = "trees area 2"), 
+             shape = 1) +
+  # Lines for the models
+  geom_line(data = res1.1, aes(x = x, y = y, color = "growth model a1")) +
+  geom_line(data = res2.1, aes(x = x2, y = y, color = "growth model a2")) +
+  # Manual colors
+  scale_color_manual(
+    name = "Legend",
+    values = c(
+      "trees area 1"      = "pink",
+      "trees area 2"      = "grey",
+      "growth model a1"   = "magenta",
+      "growth model a2"   = "black"
+    )
+  ) +
+  labs(
+    x = "Age",
+    y = "Height [m]"
+  ) +
+  theme_minimal()
+```
+
+
+
