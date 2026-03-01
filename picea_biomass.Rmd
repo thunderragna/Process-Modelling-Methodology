@@ -1,0 +1,119 @@
+---
+title: "picea_biomass"
+author: "Schloessmann"
+date: "2026-02-10"
+output: html_document
+---
+
+# 1.0 Check datasets area1 and area2 for dbh ranges and heights
+## 1.1 area 1
+```{r}
+area1$dbh.cm[
+  area1$age.base == 120
+]
+```
+
+```{r}
+area1$height[
+  area1$age.base == 120
+]
+```
+
+
+```{r}
+a1_dbh120 <- (42.2 + 41.6)/2
+```
+41.9cm
+```{r}
+a1_height120 <- (34.7+35.0)/2
+```
+34.85m
+
+## 1.2 area 2
+```{r}
+area2$dbh.cm[
+  area2$age.base == 120
+]
+area2$height[
+  area2$age.base == 120
+]
+```
+```{r}
+a2_dbh120 <- (23.8 + 25.6 + 32.8)/3
+``` 
+27.4cm
+```{r}
+a2_height120 <- (16.9 + 18.3 + 21.6)/3
+```
+18.93
+# 2.0 Biomass equations
+## 2.1 area 1
+154, Sweden
+```{r}
+logAB1 <- -1.2908 + 0.891 * log10(34.85* (41.9^2))
+AB1 <- 10^logAB1
+AB1
+```
+151, Iceland
+```{r}
+AB1.2 <- 0.2465*(41.9^2.12)*(34.85^-0.167)
+AB1.2
+```
+
+
+
+## 2.2 area 2
+146, Germany
+```{r}
+AB2 <- -43.13 + 2.25*27.4+0.452*27.4^2
+AB2
+```
+
+142, Czech republic
+```{r}
+AB2.1 <- 0.11975*((27.4^2)*18.93) ^ 0.81336
+AB2.1
+```
+
+```{r}
+library(ggplot2)
+
+data <- data.frame(
+  Area = c("area 1", "area 1", "area 2", "area 2"),
+  Biomass_Type = c("SWE", "ISL", "DEU", "CZE"),
+  Biomass = c(942.08, 374.42, 357.86, 285.68)
+)
+
+# Set desired order
+data$Biomass_Type <- factor(
+  data$Biomass_Type,
+  levels = c("SWE", "ISL", "DEU", "CZE")
+)
+
+ggplot(data, aes(x = Area, y = Biomass, fill = Biomass_Type)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_manual(
+    values = c(
+      "SWE" = "#C0007A",
+      "ISL" = "#F062C0",
+      "DEU" = "#4D4D4D",
+      "CZE" = "#BDBDBD"
+    ),
+    breaks = c("SWE", "ISL", "DEU", "CZE")  # ensures legend order
+  ) +
+  theme_minimal() +
+  labs(
+    x = "Area",
+    y = "AB [kg]",
+    fill = "AB model"
+  )
+```
+
+```{r}
+942.08/100
+```
+
+```{r}
+374.43/9.42
+```
+
